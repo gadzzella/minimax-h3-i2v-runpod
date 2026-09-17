@@ -1,0 +1,11 @@
+{
+  "input": {
+    "image": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/input/transparent_rgb_gaming_mouse.png",
+    "prompt": "The transparent gaming mouse rests on a dark reflective surface under dramatic blue and orange rim lighting. The camera slowly pushes in as internal circuitry glows through the acrylic shell. Audio: deep pulsing sub-bass, soft mechanical clicks.",
+    "width": 864,
+    "height": 480,
+    "duration_seconds": 4,
+    "turbo": true,
+    "seed": 42
+  }
+}
