@@ -33,6 +33,17 @@ VIDEO_VAE = "minimax_h3_video_vae_fp16.safetensors"
 AUDIO_VAE = "minimax_h3_audio_vae_fp32.safetensors"
 TURBO_LORA = "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors"
 
+# Friendly-name -> actual filename in models/loras/. Add one entry here for
+# every LoRA you baked in via EXTRA_LORAS in scripts/download_models.py, so
+# job requests can say {"name": "my_style"} instead of the full filename.
+# (An unrecognized name is still tried as a literal filename, so this is
+# convenience, not a hard requirement.)
+LORA_CATALOG: dict[str, str] = {
+    "helper_v4": "helper_v4_fl2va_ref2va.safetensors",
+    # "my_style": "cool_style_v2.safetensors",
+    # "character_x": "character_lora.safetensors",
+}
+
 # With a turbo-hybrid checkpoint, "turbo" just means "use fewer steps" —
 # there's no LoRA to attach. Community reports for this checkpoint's turbo
 # mode land around 4-8 steps; tune via the `steps` job field if results look
@@ -62,6 +73,7 @@ def build_workflow(
     last_frame_filename: str | None = None,
     turbo: bool = True,
     steps: int | None = None,
+    loras: list[dict] | None = None,
     output_prefix: str = "video/MiniMax_H3",
 ) -> tuple[dict, str]:
     """
@@ -69,6 +81,10 @@ def build_workflow(
 
     image_filename / last_frame_filename must already exist in ComfyUI's
     `input/` directory (see handler.py, which saves uploaded images there).
+
+    loras: optional list of {"name": str, "strength": float=1.0}, applied in
+    order, each stacking on the previous one's output. `name` is looked up
+    in LORA_CATALOG first, then tried as a literal filename in models/loras/.
     """
     length = snap_length(duration_seconds)
     g: dict = {}
@@ -106,6 +122,20 @@ def build_workflow(
             },
         }
         model_ref = ["turbo_lora", 0]
+
+    for i, lora in enumerate(loras or []):
+        lora_name = LORA_CATALOG.get(lora["name"], lora["name"])
+        strength = float(lora.get("strength", 1.0))
+        node_id = f"lora_{i}"
+        g[node_id] = {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {
+                "model": model_ref,
+                "lora_name": lora_name,
+                "strength_model": strength,
+            },
+        }
+        model_ref = [node_id, 0]
 
     resolved_steps = steps or (TURBO_STEPS if turbo else DEFAULT_STEPS)
 

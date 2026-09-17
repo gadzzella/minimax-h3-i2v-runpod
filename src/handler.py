@@ -117,6 +117,7 @@ def handler(job: dict) -> dict:
             last_frame_filename=last_frame_name,
             turbo=bool(job_input.get("turbo", True)),
             steps=job_input.get("steps"),
+            loras=job_input.get("loras"),
             output_prefix=f"video/{uuid.uuid4().hex}",
         )
 

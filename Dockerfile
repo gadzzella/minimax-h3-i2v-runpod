@@ -8,6 +8,7 @@
 # frees GitHub Actions runner disk first):
 #   DOCKER_BUILDKIT=1 docker build \
 #     --secret id=HF_TOKEN,env=HF_TOKEN \
+#     --secret id=CIVITAI_TOKEN,env=CIVITAI_TOKEN \
 #     -t myrepo/minimax-h3-i2v:latest .
 
 FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
@@ -53,7 +54,9 @@ RUN mkdir -p models/diffusion_models models/text_encoders models/vae models/lora
 # never gets written into an image layer or the build history. ---
 COPY scripts/download_models.py /workspace/download_models.py
 RUN --mount=type=secret,id=HF_TOKEN \
+    --mount=type=secret,id=CIVITAI_TOKEN \
     HF_TOKEN="$(cat /run/secrets/HF_TOKEN 2>/dev/null || true)" \
+    CIVITAI_TOKEN="$(cat /run/secrets/CIVITAI_TOKEN 2>/dev/null || true)" \
     python /workspace/download_models.py
 
 # --- Handler code ---

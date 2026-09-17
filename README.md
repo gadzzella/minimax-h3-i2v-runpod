@@ -141,6 +141,56 @@ for the full range up to `1920×1088`.
 
 Decode `video_base64` to get an MP4 with synced audio.
 
+## Adding LoRAs
+
+Two places, one per half of the pipeline:
+
+1. **`scripts/download_models.py`** — add each LoRA to `EXTRA_LORAS` (for
+   Hugging Face repos) or `DIRECT_URL_LORAS` (for a direct download URL —
+   Civitai's "Copy download link" URL works as-is). These get baked into
+   `models/loras/` at build time, same as everything else.
+   - `HF_TOKEN` covers gated HF repos; `CIVITAI_TOKEN` covers gated/early-access
+     Civitai downloads — set it as a repo secret the same way as `HF_TOKEN`
+     if a Civitai model needs one. Public Civitai downloads work without it.
+2. **`src/workflow.py`** — optionally add a friendly name to `LORA_CATALOG`
+   mapping to that same filename, so requests can say `"my_style"` instead
+   of the full `.safetensors` name.
+
+⚠️ **One compatibility gotcha specific to this checkpoint**: the active
+diffusion model is a *pruned* checkpoint (`int8_convrot`). LoRAs trained
+against the **full/bf16 H3 model that specifically target step-distillation /
+timestep-conditioning** (i.e. "turbo" or speed LoRAs) restructure a part of
+the network that pruning changes, and don't merge correctly with a plain
+`LoraLoaderModelOnly` node on a pruned checkpoint — they need special
+pruned-aware conversion. Ordinary style/quality/motion "helper" LoRAs don't
+usually touch that part of the network and are fine. If a LoRA description
+mentions steps, distillation, or "turbo," check it was built for (or
+converted for) pruned checkpoints before trusting it; otherwise, test one
+generation before relying on it.
+
+No workflow *structure* change needed beyond that — the graph already has a
+general LoRA-stacking mechanism built in (`build_workflow`'s `loras`
+parameter chains as many `LoraLoaderModelOnly` nodes as you give it). Pick
+and stack LoRAs **per request**, at runtime, no rebuild required:
+
+```json
+{
+  "input": {
+    "image": "...",
+    "prompt": "...",
+    "loras": [
+      {"name": "helper_v4", "strength": 0.8},
+      {"name": "character_x", "strength": 1.0}
+    ]
+  }
+}
+```
+
+`strength` defaults to `1.0` if omitted. They apply in list order, each
+stacking on the previous one's output. An unrecognized `name` is still
+tried as a literal filename in `models/loras/`, so registering it in
+`LORA_CATALOG` is convenience, not a requirement.
+
 ## Repo layout
 
 ```

@@ -62,4 +62,5 @@ jobs:
           # today, so an empty/unset secret is fine too.
           secrets: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
+            CIVITAI_TOKEN=${{ secrets.CIVITAI_TOKEN }}
           no-cache: true
