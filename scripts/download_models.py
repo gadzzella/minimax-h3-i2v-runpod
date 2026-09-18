@@ -143,7 +143,7 @@ def fetch(repo_id: str, filename: str, subdir: str) -> None:
 
 
 def main() -> None:
-    os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "1")
+    os.environ.setdefault("HF_XET_HIGH_PERFORMANCE", "1")
 
     for repo_id, filename, subdir in FILES:
         fetch(repo_id, filename, subdir)

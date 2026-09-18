@@ -11,18 +11,16 @@
 #     --secret id=CIVITAI_TOKEN,env=CIVITAI_TOKEN \
 #     -t myrepo/minimax-h3-i2v:latest .
 
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+FROM nvidia/cuda:13.0.0-runtime-ubuntu22.04
 
 ARG COMFYUI_REF=v0.36.0
-ARG INCLUDE_TURBO_LORA=1
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    HF_HUB_ENABLE_HF_TRANSFER=1 \
+    HF_XET_HIGH_PERFORMANCE=1 \
     PIP_NO_CACHE_DIR=1 \
     COMFYUI_ROOT=/workspace/comfyui \
-    COMFYUI_MODELS_DIR=/workspace/comfyui/models \
-    INCLUDE_TURBO_LORA=${INCLUDE_TURBO_LORA}
+    COMFYUI_MODELS_DIR=/workspace/comfyui/models
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3.11 python3.11-venv python3-pip \
@@ -39,8 +37,14 @@ RUN git clone --depth 1 --branch ${COMFYUI_REF} \
 
 WORKDIR /workspace/comfyui
 
-# CUDA-matched torch first, then ComfyUI's own deps.
-RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+# Torch: ComfyUI (>= 0.33, and definitely v0.36+) requires cu130 or newer on
+# modern NVIDIA GPUs — comfy_kitchen (its compiled quantization kernel
+# package, needed for int8_convrot checkpoints like ours) relies on
+# torch.library schema-inference behavior that only landed in newer torch
+# releases. cu124's torch build predates it and fails at import with a
+# "Parameter stride has unsupported type list[int]" error. Don't downgrade
+# this back to cu124.
+RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
 RUN pip install -r requirements.txt
 
 # Handler-side deps.
