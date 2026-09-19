@@ -1,30 +1,11 @@
 """
-Constructs the MiniMax H3 image-to-video graph in ComfyUI's API (/prompt)
-format.
+Constructs the MiniMax H3 image-to-video graph in ComfyUI's API (/prompt) format.
 
-This mirrors ComfyUI's own native template `video_minimax_h3_i2v.json`
-(Comfy-Org/workflow_templates), flattened out of its subgraph form:
-
-  LoadImage -> MiniMaxH3ImageToVideo (clip, vae, first_frame, prompt, w, h, length)
-             -> BasicGuider -> SamplerCustomAdvanced -> VAEDecode -> \
-             -> VAEDecodeAudio -----------------------------------> CreateVideo -> SaveVideo
-
-MiniMaxH3ImageToVideo is a native ComfyUI core node (added in ComfyUI PR
-#15224, ComfyUI >= 0.33) that builds both the positive conditioning and the
-initial A/V latent in one step, so no separate CLIPTextEncode is needed.
+This mirrors ComfyUI's native template `video_minimax_h3_i2v.json`, flattened:
+LoadImage -> MiniMaxH3ImageToVideo -> BasicGuider -> SamplerCustomAdvanced -> VAEDecode -> CreateVideo
 """
 from __future__ import annotations
 
-# Active diffusion model: TenStrip/10Eros-Max, a MiniMax H3 fine-tune
-# (same architecture/UNETLoader format as the base model). This is a
-# "TURBO-hybrid" build — turbo distillation is already baked into the
-# weights, so USE_SEPARATE_TURBO_LORA stays False: stacking the base
-# model's separate turbo LoRA on top of an already-turbo checkpoint would
-# double up the distillation and likely degrade or break output.
-#
-# To revert to the vanilla base model, set DIFFUSION_MODEL back to
-# "minimax_h3_fl2va_pruned_int8_convrot.safetensors" and USE_SEPARATE_TURBO_LORA
-# back to True (and re-enable INCLUDE_TURBO_LORA in download_models.py).
 DIFFUSION_MODEL = "10Eros_Max_h3_TURBO-hybrid_beta4_int8_convrot.safetensors"
 USE_SEPARATE_TURBO_LORA = False
 
@@ -33,21 +14,10 @@ VIDEO_VAE = "minimax_h3_video_vae_fp16.safetensors"
 AUDIO_VAE = "minimax_h3_audio_vae_fp32.safetensors"
 TURBO_LORA = "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors"
 
-# Friendly-name -> actual filename in models/loras/. Add one entry here for
-# every LoRA you baked in via EXTRA_LORAS in scripts/download_models.py, so
-# job requests can say {"name": "my_style"} instead of the full filename.
-# (An unrecognized name is still tried as a literal filename, so this is
-# convenience, not a hard requirement.)
 LORA_CATALOG: dict[str, str] = {
     "helper_v4": "helper_v4_fl2va_ref2va.safetensors",
-    # "my_style": "cool_style_v2.safetensors",
-    # "character_x": "character_lora.safetensors",
 }
 
-# With a turbo-hybrid checkpoint, "turbo" just means "use fewer steps" —
-# there's no LoRA to attach. Community reports for this checkpoint's turbo
-# mode land around 4-8 steps; tune via the `steps` job field if results look
-# under/over-cooked.
 DEFAULT_STEPS = 20
 TURBO_STEPS = 8
 FPS = 24
@@ -55,9 +25,8 @@ FPS = 24
 
 def snap_length(duration_seconds: float) -> int:
     """
-    Reproduce the official template's Math Expression node exactly:
+    Reproduce official template Math Expression:
         max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17
-    H3 generates in blocks of 17 frames + 5, at 24 fps.
     """
     frames = max(5, round(duration_seconds * FPS))
     return frames + (5 - (frames % 17)) % 17
@@ -76,16 +45,6 @@ def build_workflow(
     loras: list[dict] | None = None,
     output_prefix: str = "video/MiniMax_H3",
 ) -> tuple[dict, str]:
-    """
-    Returns (prompt_graph, save_node_id) ready to POST to ComfyUI's /prompt.
-
-    image_filename / last_frame_filename must already exist in ComfyUI's
-    `input/` directory (see handler.py, which saves uploaded images there).
-
-    loras: optional list of {"name": str, "strength": float=1.0}, applied in
-    order, each stacking on the previous one's output. `name` is looked up
-    in LORA_CATALOG first, then tried as a literal filename in models/loras/.
-    """
     length = snap_length(duration_seconds)
     g: dict = {}
 
@@ -124,6 +83,8 @@ def build_workflow(
         model_ref = ["turbo_lora", 0]
 
     for i, lora in enumerate(loras or []):
+        if not isinstance(lora, dict) or "name" not in lora:
+            continue
         lora_name = LORA_CATALOG.get(lora["name"], lora["name"])
         strength = float(lora.get("strength", 1.0))
         node_id = f"lora_{i}"
