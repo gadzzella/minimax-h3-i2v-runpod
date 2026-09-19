@@ -5,8 +5,6 @@ ARG COMFYUI_REF=v0.36.0
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    HF_XET_HIGH_PERFORMANCE=1 \
-    HF_HUB_ENABLE_HF_TRANSFER=1 \
     PIP_NO_CACHE_DIR=1 \
     COMFYUI_ROOT=/workspace/comfyui \
     COMFYUI_MODELS_DIR=/workspace/comfyui/models \

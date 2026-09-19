@@ -2,19 +2,15 @@
 """
 Bakes the MiniMax H3 (FL2VA / image-to-video) model files into the image at
 build time, straight into ComfyUI's model folders.
-
-Files match exactly what ComfyUI's official native template
-(video_minimax_h3_i2v.json, ComfyUI >= 0.33) expects to find, so the graph
-in src/workflow.py resolves every checkpoint by filename with no extra config.
-
-Controlled by env vars (all optional):
-  HF_TOKEN              - HuggingFace token, needed for gated repos
-  CIVITAI_TOKEN          - Civitai API key, needed for gated/mature downloads
-  COMFYUI_MODELS_DIR     - defaults to /workspace/comfyui/models
 """
+import gc
 import os
 import sys
 import requests
+
+# Disable hf_transfer to prevent GitHub Actions RAM OOM during massive downloads
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
+
 from huggingface_hub import hf_hub_download
 
 MODELS_DIR = os.environ.get("COMFYUI_MODELS_DIR", "/workspace/comfyui/models")
@@ -63,6 +59,7 @@ def fetch_lora(repo_id: str, filename: str, local_filename: str) -> None:
     target_path = os.path.join(dest_dir, local_filename)
     if downloaded_path != target_path:
         os.replace(downloaded_path, target_path)
+    gc.collect()
 
 
 def fetch_lora_from_url(url: str, local_filename: str) -> None:
@@ -80,6 +77,7 @@ def fetch_lora_from_url(url: str, local_filename: str) -> None:
         with open(dest_path, "wb") as f:
             for chunk in r.iter_content(chunk_size=1 << 20):
                 f.write(chunk)
+    gc.collect()
 
 
 def fetch(repo_id: str, filename: str, subdir: str) -> None:
@@ -93,15 +91,13 @@ def fetch(repo_id: str, filename: str, subdir: str) -> None:
         local_dir_use_symlinks=False,
         token=HF_TOKEN,
     )
+    gc.collect()
 
 
 def main() -> None:
-    os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
-
     for repo_id, filename, subdir in FILES:
         fetch(repo_id, filename, subdir)
 
-    # Explicitly fetch Turbo LoRA into models/loras/
     fetch(TURBO_LORA[0], TURBO_LORA[1], TURBO_LORA[2])
 
     for repo_id, filename, local_filename in EXTRA_LORAS:

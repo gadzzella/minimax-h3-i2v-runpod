@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Free disk space
+      - name: Free disk space & allocate swap
         uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: true
@@ -23,22 +23,6 @@ jobs:
           large-packages: true
           docker-images: true
           swap-storage: true
-
-      - name: Aggressive manual cleanup
-        run: |
-          sudo rm -rf /usr/lib/jvm
-          sudo rm -rf /usr/share/swift
-          sudo rm -rf /usr/local/.ghcup
-          sudo rm -rf /usr/local/julia*
-          sudo rm -rf /usr/local/share/chromium
-          sudo rm -rf /opt/microsoft /opt/google
-          sudo rm -rf /opt/az
-          sudo rm -rf /usr/local/share/powershell
-          sudo apt-get clean
-          sudo apt-get autoremove -y
-          docker system prune -af --volumes || true
-          docker builder prune -af || true
-          df -h
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -55,11 +39,6 @@ jobs:
           context: .
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/minimax-h3-i2v:latest
-          # HF_TOKEN is passed as a BuildKit secret, not a build-arg, so it
-          # is never baked into an image layer or the build cache/history.
-          # Only needed at all if a source HF repo ever becomes gated —
-          # Comfy-Org/MiniMax-H3 and lightx2v/Minimax-h3-Turbo are public
-          # today, so an empty/unset secret is fine too.
           secrets: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
             CIVITAI_TOKEN=${{ secrets.CIVITAI_TOKEN }}
